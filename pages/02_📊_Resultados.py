@@ -36,8 +36,9 @@ with st.sidebar:
 if visualizar:
 
     # ----------- MÉTRICAS DE DESEMPENHO -----------
-    if visualizacao == "Métricas de Desempenho":
-        st.header("📊 Métricas de Desempenho do Modelo", divider="green")        
+    if visualizacao == "Métricas de Desempenho":        
+        st.header("📊 Métricas de Desempenho do Modelo")
+        progress = st.progress(50, text="Calculando Métricas de Desempenho...")
 
         metricas = calcular_metricas_fraude(matriz)
 
@@ -52,14 +53,12 @@ if visualizar:
             st.markdown("### KPIs Principais")
             st.metric("1 - Precisão dos Alertas (%) ", metricas["precisao_alerta"])
             st.metric("2 - Recall de Fraudes (%) "  , metricas["recall_fraude"])
-            st.metric("3 - Falsos Positivos (%) ", metricas["taxa_falsos_positivos"])
-        
-        #with col3:
+            st.metric("3 - Falsos Positivos (%) ", metricas["taxa_falsos_positivos"])            
             
             st.metric("4 - Falsos Negativos (%) ", metricas["taxa_falsos_negativos"])        
             st.metric("5 - Taxa de Alertas (%) ", metricas["taxa_alerta"])
             st.metric("6 - Taxa Não Alertada (%) ", metricas["taxa_nao_alerta"])
-            st.metric("7 - F1-Score ", metricas["f1_score"])            
+            st.metric("7 - F1-Score (%) ", metricas["f1_score"])            
                  
         with col3:
             st.markdown("""
@@ -78,13 +77,15 @@ if visualizar:
         - *proporção de transações consideradas seguras.*
         ##### 7) - **F1-Score:**
          - *equilíbrio entre precisão e recall.*
-        """)                
+        """)
+        progress.progress(100, text="Cálculo Concluído!")
                 
             
 
     # ----------- IMPACTO FINANCEIRO -----------
-    if visualizacao == "Impacto Financeiro":
-        st.header("💰 Impacto Financeiro da Detecção de Fraudes", divider="green")        
+    if visualizacao == "Impacto Financeiro":        
+        st.header("💰 Impacto Financeiro da Detecção de Fraudes")
+        progress = st.progress(50, text="Calculando Impacto Financeiro...")        
 
         df_impacto, fig_impacto = calcular_e_plotar_impacto(matriz, valor_medio_emprestimo=1200, taxa_juros=0.29)
 
@@ -100,12 +101,14 @@ if visualizar:
         - **Perda por fraudes aprovadas**: prejuízo causado por fraudes que passaram.  
         - **Perda por bons reprovados**: receita perdida por clientes legítimos rejeitados.  
         - **Economia por fraudes reprovadas**: valor economizado ao bloquear fraudes corretamente.  
-        """)            
+        """)
+        progress.progress(100, text="Cálculo Concluído!")
             
 
     # ----------- ROI -----------
     if visualizacao == "ROI":        
         st.header("📈 ROI da Detecção de Fraudes", divider="green")        
+        progress = st.progress(50, text="Calculando ROI...")
 
         df_impacto, _ = calcular_e_plotar_impacto(matriz, valor_medio_emprestimo=1200, taxa_juros=0.29)
         economia = df_impacto.loc[df_impacto["Cenário"] == "Economia por fraudes reprovadas", "Valor (R$)"].values[0]                
@@ -132,6 +135,7 @@ if visualizar:
                     
 
         col1, col2 = st.columns([0.65, 0.35], border=True)
+    
         with col1:
             st.plotly_chart(fig_waterfall, use_container_width=True)        
 
@@ -155,18 +159,21 @@ if visualizar:
             - **Custo do projeto**: investimento necessário.  
             - **ROI líquido**: diferença entre economia e custo.  
             """)
-              
-         
+            
+        
             st.markdown("<hr style='border: 1px solid #2ecc71'>", unsafe_allow_html=True)            
             st.markdown("## Resumo Financeiro:")
             st.metric("Retorno Líquido (R$)", f"{(retorno_liquido ):,.2f}")
             st.metric("Economia Total (R$) -> Excluindo-se os custos do projeto ", f"{(economia ):,.2f}")
             st.metric("ROI (%)", f"{roi_percentual:.2f}%")
+
+        progress.progress(100, text="Cálculo Concluído!")
             
 
     # ----------- PROPORÇÃO DE FRAUDES -----------
-    if visualizacao == "Proporção de Fraudes":
+    if visualizacao == "Proporção de Fraudes":        
         st.header("📉 Proporção de Fraudes Detectadas vs Não Detectadas", divider="green")
+        progress = st.progress(50, text="Calculando Proporção de Fraudes...")
         col1, col2 = st.columns([0.35, 0.65], border=True)
         with col1:
             st.markdown("""
@@ -187,3 +194,5 @@ if visualizar:
             
         with col2:
             st.plotly_chart(plot_proporcao_fraudes(matriz), use_container_width=True)
+
+        progress.progress(100, text="Cálculo Concluído!")

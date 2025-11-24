@@ -16,8 +16,14 @@ accuracy, confusion = load("objects/metricas.pkl")
 
 # Interface lateral
 with st.sidebar:
-    st.markdown("## 📊 Acurácia do Modelo")
-    st.markdown(f"**{accuracy*100:.2f}%** baseado nos dados de validação")
+            # Valor da acurácia com destaque visual na barra lateral     
+    st.markdown(f"""
+        <div style='margin-top: 6px; padding: 15px; background-color: #f9f9f9; border-left: 7px solid #239728; border-radius: 10px;'>
+            <span style='font-size: 30px; font-weight: bold; color: #239728;'>{accuracy*100:.2f}%</span>
+            <br>
+            <span style='font-size: 16px; color: #090;'>Desempenho baseado nos dados de validação</span>
+        </div>
+        """, unsafe_allow_html=True)
     st.markdown("---")
     st.markdown(markdown, unsafe_allow_html=True)
     # (links e rodapé mantidos)
@@ -55,6 +61,7 @@ if dataset is not None:
 
 # Botão de previsão
 if st.button("Avaliar Transação"):
+    progress = st.progress(50, "Aguarde... Avaliando a Transação")
     dados_novos = pd.DataFrame([entrada])
     for coluna in colunas_selecionadas:
         if dados_novos[coluna].dtype == 'object':        
@@ -72,3 +79,5 @@ if st.button("Avaliar Transação"):
 
     else:
         st.success(f"✅ Transação legítima. Probabilidade de fraude: {probabilidade:.2f}%")
+    
+    progress.progress(100, "Avaliação Concluída!")        

@@ -48,6 +48,7 @@ selected_id = st.sidebar.number_input("Selecione o ID da Transação:", min_valu
 # --- Lógica de Explicabilidade ---
 if st.sidebar.button("Analisar Transação", use_container_width=True, 
                      type='primary', help="Clique para gerar a interpretação"):
+    progress = st.sidebar.progress(50, "Aguarde.... Gerando Explicabilidade do Modelo")
     transaction_data = pd.DataFrame([X_test[selected_id]], columns=colunas_selecionadas)
     original_data_row = original_data.iloc[selected_id:selected_id+1]
     y_true = y_teste.iloc[selected_id]
@@ -84,14 +85,16 @@ if st.sidebar.button("Analisar Transação", use_container_width=True,
         title="Contribuição para a previsão",
         xaxis_title="Valor da contribuição",
         yaxis_title="Características da Transação",
-        height=550,
+        height=500,
         margin=dict(l=30, r=30, t=40, b=30),
         xaxis=dict(zeroline=True, zerolinewidth=2, zerolinecolor='gray'),        
     )
 
+    progress.progress(80, "Quase lá... Finalizando a análise")
     col1, col2 = st.columns([0.65, 0.35], gap="medium", border=True)
     
         
+    progress.progress(100, "Geração da análise Concluída!")
     # Apresentação do gráfico SHAP
     with col1:
         
@@ -133,4 +136,5 @@ if st.sidebar.button("Analisar Transação", use_container_width=True,
             - **Barras verdes**: reduzem a probabilidade de fraude.
                 
         """)
+
 st.sidebar.markdown(markdown, unsafe_allow_html=True)
