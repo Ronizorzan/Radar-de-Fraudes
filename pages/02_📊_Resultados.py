@@ -1,136 +1,189 @@
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 import streamlit as st
-import numpy as np
-from plots import *
+import pandas as pd
 from joblib import load
+import plotly.express as px
+import plotly.graph_objects as go
+from plots import (
+    calcular_metricas_fraude,
+    calcular_e_plotar_impacto,
+    plot_taxa_fraude,
+    plot_proporcao_fraudes,
+    plot_radar_metricas,
+    markdown
+)
 
+# ---------------- Configuração da Página ----------------
+st.set_page_config(page_title="Relatório de Detecção de Fraudes", layout="wide")
 
-#Configuração da página
-st.set_page_config(page_title="Relatório Financeiro", layout="wide", initial_sidebar_state="expanded")
-
-
-# Carrega matriz de confusão
+# ---------------- Carregamento da Matriz ----------------
 _, matriz = load("objects/metricas.pkl")
 
+# ---------------- Barra Lateral ----------------
+with st.sidebar:
+    st.title("📈 Navegação")
+    visualizacao = st.radio(
+        ":green[Selecione a visualização]", ("Métricas de Desempenho", "Impacto Financeiro", "ROI", "Proporção de Fraudes"), 
+        label_visibility="visible"
+         )
+    if visualizacao == "ROI":
+        custo_projeto = st.number_input("Custo do Projeto (R$):", min_value=1000, value=80000, step=1000)
+    visualizar = st.button("Visualizar", use_container_width=True,
+                            help="Clique para gerar a visualização selecionada.", type='primary')
 
-# Calcula métricas necessárias para plotagens apartir da matriz de confusão
-resultado_xgb = calcular_metricas(matriz)
-
-
-# Controles da Barra Lateral
-with st.sidebar:    
-    valor_medio_emprest = np.float32(1000)
-    taxa_juros = np.int32(29) / 100  # Taxa de juros padrão de 29%
-
-    st.title("Visualização dos Resultados")
-    with st.expander("Configurações das visualizações", expanded=True):
-        df_final = pd.read_csv('Fraud_transactions.csv')  # Carrega o DataFrame final do arquivo CSV
-        visualizacao = st.radio("Selecione o tipo de visualização", ("Análise Descritiva", "Impacto Financeiro", "Redução da Inadimplência",
-                                                                      "Taxa de Aprovação"))
-    valor_medio_emprest = st.number_input("Valor médio dos empréstimos", min_value=0., max_value=1000000.,
-                                                  value=df_final['amount'].mean(), step=100., help="Insira o valor médio dos empréstimos\
-                                                  para calcular o impacto financeiro")
-    if visualizacao == "Impacto Financeiro":
-        taxa_juros = st.slider("Taxa média de juros", min_value=0, max_value=100, value=29,
-                                help="Selecione a taxa de juros cobrada por empréstimo\
-                                \ne veja como os valores se atualizam no gráfico") / 100            
-    visualizar = st.button("Visualizar")
-
-# Rodapé na barra lateral com as informações do desenvolvedor
     st.markdown(markdown, unsafe_allow_html=True)
-           
 
-if visualizar:    
-    resultados, figura_impacto = calcular_e_plotar_impacto(matriz, valor_medio_emprest, taxa_juros)
-    if visualizacao == "Análise Descritiva":        
-        st.header("Análise Descritiva")
-        st.markdown("<hr style='border: 2px solid #008000'>", unsafe_allow_html=True)
-        col1, col2 = st.columns([0.55, 0.45], gap="medium")
-        
+# ---------------- Conteúdo Principal ----------------
+if visualizar:
+
+    # ----------- MÉTRICAS DE DESEMPENHO -----------
+    if visualizacao == "Métricas de Desempenho":
+        st.header("📊 Métricas de Desempenho do Modelo", divider="green")        
+
+        metricas = calcular_metricas_fraude(matriz)
+
+        col1, col2, col3 = st.columns([0.55, 0.15, 0.3], border=True)
         with col1:
-            #fig_hist = plot_hist(df_final, df_final.select_dtypes(include=[np.number]).columns.tolist())
-            #st.pyplot(fig_hist, use_container_width=True)
-            st.write(valor_medio_emprest)
+
+            st.plotly_chart(plot_radar_metricas(metricas), use_container_width=True,
+                             config={"displayModeBar": False, 'height': 700})        
         
+            
         with col2:
-            st.markdown("<div style='font-size: 28px; font-weight: bold; color: #008000'>Relatório de Análise Descritiva", unsafe_allow_html=True)
-            st.write("A análise descritiva dos dados é uma etapa fundamental para entender a distribuição e as características\
-                      das variáveis numéricas do dataset. O histograma acima apresenta a distribuição de cada variável numérica,\
-                      permitindo identificar padrões, tendências e possíveis outliers.")
-
-    if visualizacao == "Impacto Financeiro": # Gráfico e relatório de impacto financeiro
-        st.header("Impacto Financeiro")
-        st.markdown("<hr style='border: 2px solid #008000'>", unsafe_allow_html=True)
-        col1, col2 = st.columns([0.55,0.45], gap="medium")
-        with col1:            
-            st.pyplot(figura_impacto, use_container_width=True)               
-            st.write(matriz)
-
-        with col2:
-            st.markdown("<div style='font-size: 28px; font-weight: bold; color: #008000'>Relatório de Impacto Detalhado", unsafe_allow_html=True)
-            st.write(resultados.round(2))
-            retorno_modelo = (resultados.iloc[1,3]) - (resultados.iloc[0,3])
-            st.markdown(f"<div style='font-size: 23px; font-weight: bold; color: #008000'>Retorno\
-                        líquido estimado utilizando o modelo: R$ {retorno_modelo:,.2f} ", unsafe_allow_html=True)
-                        
-            st.markdown("<hr style='border: 2px solid #008000'>", unsafe_allow_html=True)            
-            st.markdown("<div style='font-size: 28px; font-weight: bold; color: #008000'>Descrição da visualização ", unsafe_allow_html=True)
-            st.markdown("<div style='font-size: 18px; font-weight: sans serif'>O gráfico ao labo traz uma análise detalhada\
-                        dos ganhos com bons pagadores, subtraindo-se as perdas com inadimplência e possível perda de clientes.\
-                        Através dele é possível ter uma estimativa real dos possíveis\
-                        retornos financeiros alcançáveis com o uso de Redes Neurais comparado a um modelo menos preciso e \
-                        também ao cenário atual da empresa que não utiliza Inteligência Artificial na aprovação dos seus clientes (baseline).", unsafe_allow_html=True)                                            
-     
-    if visualizacao == "Redução da Inadimplência": # Gráfico e relatório de Inadimplência
-        st.header("Redução da Inadimplência", anchor="red_inadimplencia")
-        st.markdown("<hr style='border: 2px solid #2020df'>", unsafe_allow_html=True)
-        col1, col2 = st.columns([0.6, 0.4], gap="small")
-        with col1:            
-            resultados = calcular_metricas(matriz)            
-            figura_inad = plot_inadimplencia(resultados['inadimplencia_sem_modelos'],
-                                         resultados['inadimplencia_prevista'])
-            st.pyplot(figura_inad, use_container_width=True)
+            st.markdown("### KPIs Principais")
+            st.metric("1 - Precisão dos Alertas (%) ", metricas["precisao_alerta"])
+            st.metric("2 - Recall de Fraudes (%) "  , metricas["recall_fraude"])
+            st.metric("3 - Falsos Positivos (%) ", metricas["taxa_falsos_positivos"])
         
-        with col2:
-            st.markdown("<div style='font-size: 30px; font-weight: bold; color: #2020df'>Descrição da visualização", unsafe_allow_html=True)
-            st.markdown("<div style='font-size: 20px; font-weight: bold'>Este gráfico compara três abordagens distintas e revela o poder dos modelos\
-                         de inteligência artificial para transformar a gestão de risco e aumentar a rentabilidade nos negócios.", unsafe_allow_html=True)            
+        #with col3:
             
-            st.markdown("<hr style='border: 2px solid #2020df'>", unsafe_allow_html=True) # Linha de separação
-
-            st.markdown("<div style='font-size: 30px; font-weight: bold; color: #2020df'>Comparação de Cenários", unsafe_allow_html=True)
-            st.markdown(f"<span style='font-size: 20px; font-weight: bold'>Taxa de Inadimplência Atual atinge alarmantes: \t </span>\
-                      <span style='color: red; font-size: 25px; font-weight: bold'> {resultados['inadimplencia_sem_modelos']}%</span>", unsafe_allow_html=True)
-            st.markdown(f"<span style='font-size: 20px; font-weight: bold'>Taxa de Inadimplência estimada com o uso do modelo mais\
-                        eficaz (Redes Neurais) é de apenas: </span> <span style='color: green; font-size: 25px; font-weight: bold'>\
-                        \t {resultados['inadimplencia_prevista']}0%</span>", unsafe_allow_html=True)
-            
-            st.markdown("<hr style='border: 2px solid #2020df'>", unsafe_allow_html=True) # Linha de separação
-
-            st.markdown("<div style='font-size: 30px; font-weight: bold; color: #2020df'>Impacto final na Inadimplência", unsafe_allow_html=True)
-            
-
-    
-    elif visualizacao == "Taxa de Aprovação": # Gráfico e relatório de taxa de aprovação
-        st.header("Taxa de Aprovação")
-        st.markdown("<hr style='border: 2px solid #2020df'>", unsafe_allow_html=True)
+            st.metric("4 - Falsos Negativos (%) ", metricas["taxa_falsos_negativos"])        
+            st.metric("5 - Taxa de Alertas (%) ", metricas["taxa_alerta"])
+            st.metric("6 - Taxa Não Alertada (%) ", metricas["taxa_nao_alerta"])
+            st.metric("7 - F1-Score ", metricas["f1_score"])            
+                 
+        with col3:
+            st.markdown("""
+        ## ❓ O que significa?
+        ##### 1) **Precisão dos Alertas:**
+          - *entre os alertas gerados, quantos realmente eram fraudes.*
+        ##### 2) **Recall de Fraudes:**
+          - *entre todas as fraudes reais, quantas foram capturadas pelo modelo.*
+        ##### 3) **Taxa de Falsos Positivos:**
+         - *clientes legítimos sinalizados incorretamente.*
+        ##### 4) **Taxa de Falsos Negativos:**
+        -  *fraudes que passaram despercebidas.*
+        ##### 5) **Taxa de Alertas:**
+        -  *proporção de transações sinalizadas como suspeitas.*
+        ##### 6) **Taxa Não Alertada:**
+        - *proporção de transações consideradas seguras.*
+        ##### 7) - **F1-Score:**
+         - *equilíbrio entre precisão e recall.*
+        """)                
                 
-        st.write("Taxa de Aprovação do Modelo: ", resultado_xgb["taxa_aprovacao"])
-        st.write("Taxa de Reprovação",  resultado_xgb['taxa_reprovacao'])
             
-        
-        st.markdown("<div style='font-size: 30px; font-weight: bold; color: #2020df'>Descrição da visualização", unsafe_allow_html=True)                      
-        st.markdown("<div style=' font-size: 22px; font-weight:bold'>O gráfico ao lado mostra a taxa de aprovação \
-                        de clientes. Note que Redes Neurais aprovou menos clientes que XGBoost, mas \
-                        ainda assim conseguiu captar uma maior quantidade de bons clientes e consequentemente reprovou\
-                        clientes com alto risco de se tornar inadimplentes, o que traz grandes benefícios, não\
-                        só na maior captação de recursos mas também na prevenção de perdas financeiras.</div>", unsafe_allow_html=True )
-        st.markdown("<hr style='border: 2px solid #2020df'>", unsafe_allow_html=True)
-        st.markdown("<div style='font-size: 30px; font-weight: bold; color: #2020df'>Taxa de Aprovação dos Modelos", unsafe_allow_html=True)
+
+    # ----------- IMPACTO FINANCEIRO -----------
+    if visualizacao == "Impacto Financeiro":
+        st.header("💰 Impacto Financeiro da Detecção de Fraudes", divider="green")        
+
+        df_impacto, fig_impacto = calcular_e_plotar_impacto(matriz, valor_medio_emprestimo=1200, taxa_juros=0.29)
+
+        col1, col2 = st.columns([0.65, 0.35], border=True)
+        with col1:
+
+            st.plotly_chart(fig_impacto, use_container_width=True)
+        with col2:
+            st.markdown("""
+        ### ❓ O que significa?
+        Este gráfico mostra como o modelo afeta diretamente os resultados financeiros:
+        - **Ganho com bons clientes**: receita gerada por clientes legítimos aprovados.  
+        - **Perda por fraudes aprovadas**: prejuízo causado por fraudes que passaram.  
+        - **Perda por bons reprovados**: receita perdida por clientes legítimos rejeitados.  
+        - **Economia por fraudes reprovadas**: valor economizado ao bloquear fraudes corretamente.  
+        """)            
+            
+
+    # ----------- ROI -----------
+    if visualizacao == "ROI":        
+        st.header("📈 ROI da Detecção de Fraudes", divider="green")        
+
+        df_impacto, _ = calcular_e_plotar_impacto(matriz, valor_medio_emprestimo=1200, taxa_juros=0.29)
+        economia = df_impacto.loc[df_impacto["Cenário"] == "Economia por fraudes reprovadas", "Valor (R$)"].values[0]                
+        retorno_liquido = economia - custo_projeto
+        roi_percentual = retorno_liquido / custo_projeto * 100
+
+        fig_waterfall = go.Figure(go.Waterfall(
+            name="ROI",
+            orientation="v",
+            measure=["relative", "relative", "total"],
+            x=["Economia com Fraudes Detectadas", "Custo do Projeto", "ROI Líquido"],
+            y=[economia, -custo_projeto, retorno_liquido],
+            connector={"line": {"color": "gray"}},
+            increasing={"marker": {"color": "#2ecc71"}},  # verde para economia
+            decreasing={"marker": {"color": "#e74c3c"}},  # vermelho para custo
+            totals={"marker": {"color": "#2ecc71"}}       # azul para ROI líquido
+        ))
+        fig_waterfall.update_layout(
+            title="💰 Retorno sobre Investimento (Waterfall)",
+            yaxis_title="Valor (R$)",
+            xaxis_title="Componentes",
+            height=400
+        )
+                    
+
+        col1, col2 = st.columns([0.65, 0.35], border=True)
+        with col1:
+            st.plotly_chart(fig_waterfall, use_container_width=True)        
+
+            st.markdown("<hr style='border: 1px solid #2ecc71'>", unsafe_allow_html=True)
+            st.markdown("### 💰 Interpretação Financeira")
+            st.markdown("""
+            Este gráfico demonstra o **retorno financeiro obtido com a detecção de fraudes**, comparando os ganhos com os custos do projeto.  
+            Ele refere-se ao valor que foi **recuperado ou evitado** graças à atuação do modelo:
+            - **Economia gerada** pela detecção de fraudes.
+            - **Investimento realizado** no projeto.
+            - **ROI líquido**, que representa o saldo positivo da iniciativa.
+            """)    
+            
+        with col2:
                         
-                       
+            st.markdown("""
+            ### ❓ O que significa?
+            O ROI (Retorno sobre Investimento) mostra se o projeto compensa financeiramente:
+            - **Waterfall**: O gráfico ao lado mostra o fluxo de valores até o ROI líquido.
+            - **Economia com fraudes detectadas**: valor recuperado.  
+            - **Custo do projeto**: investimento necessário.  
+            - **ROI líquido**: diferença entre economia e custo.  
+            """)
+              
+         
+            st.markdown("<hr style='border: 1px solid #2ecc71'>", unsafe_allow_html=True)            
+            st.markdown("## Resumo Financeiro:")
+            st.metric("Retorno Líquido (R$)", f"{(retorno_liquido ):,.2f}")
+            st.metric("Economia Total (R$) -> Excluindo-se os custos do projeto ", f"{(economia ):,.2f}")
+            st.metric("ROI (%)", f"{roi_percentual:.2f}%")
+            
 
+    # ----------- PROPORÇÃO DE FRAUDES -----------
+    if visualizacao == "Proporção de Fraudes":
+        st.header("📉 Proporção de Fraudes Detectadas vs Não Detectadas", divider="green")
+        col1, col2 = st.columns([0.35, 0.65], border=True)
+        with col1:
+            st.markdown("""
+            ### ❓ O que significa?
+            Este gráfico mostra a proporção de fraudes que o modelo conseguiu capturar em relação às que passaram despercebidas.
+            - **Fraudes Detectadas**: sucesso do modelo.  
+            - **Fraudes Não Detectadas**: risco residual que ainda precisa ser mitigado.  
+            """)
+                                    
+            st.markdown("### 📌 Por que essa métrica importa?")
+            st.markdown("""                        
+            #### Com ela é possível entender:
+            - **Quão bem o modelo está performando** na identificação de fraudes.
+            - **O nível de risco residual**, ou seja, fraudes que ainda escapam à detecção.               
+            - **Áreas para melhoria do modelo** e estratégias de mitigação de risco.
+            """)
 
+            
+        with col2:
+            st.plotly_chart(plot_proporcao_fraudes(matriz), use_container_width=True)

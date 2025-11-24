@@ -1,46 +1,46 @@
         
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 import plotly.graph_objects as go
+import plotly.express as px
 from sklearn.preprocessing import LabelEncoder
 from joblib import dump
 
 # ------------------------ Cálculo de Métricas e Impacto -----------------------------
-def calcular_metricas(matriz_confusao):
+
+def calcular_metricas_fraude(matriz_confusao):
     """
-    Calcula métricas de desempenho do modelo com base na matriz de confusão.
-
-    Parâmetros:
-        matriz_confusao (np.array): Matriz de confusão no formato [[VN, FP], [FN, VP]]
-
-    Retorna:
-        dict: Dicionário com métricas de inadimplência, captação e aprovação
+    Calcula métricas de desempenho do modelo de detecção de fraudes com base na matriz de confusão.
     """
     VN, FP = matriz_confusao[0]
     FN, VP = matriz_confusao[1]
 
     total = VN + FP + FN + VP
-    total_aprovados = VN + FP
-    total_reais_fraudulentos = FN + VP
+    total_alertas = VP + FP
+    total_fraudes_reais = FN + VP
 
-    inadimplencia_real = (VP + FP) / total * 100 if total > 0 else 0
-    inadimplencia_prevista = FP / total_aprovados * 100 if total_aprovados > 0 else 0
-    captacao_bons_clientes = VP / total_reais_fraudulentos * 100 if total_reais_fraudulentos > 0 else 0
-    taxa_aprovacao = (VP + FP) / total * 100 if total > 0 else 0
-    taxa_reprovacao = 100 - taxa_aprovacao
+    # Métricas principais
+    precisao_alerta = VP / total_alertas * 100 if total_alertas > 0 else 0
+    recall_fraude = VP / total_fraudes_reais * 100 if total_fraudes_reais > 0 else 0
+    taxa_alerta = total_alertas / total * 100 if total > 0 else 0
+    taxa_nao_alerta = 100 - taxa_alerta
+
+    # Métricas adicionais
+    f1_score = (2 * precisao_alerta * recall_fraude / (precisao_alerta + recall_fraude)
+                if (precisao_alerta + recall_fraude) > 0 else 0)
+    taxa_fp = FP / (FP + VN) * 100 if (FP + VN) > 0 else 0
+    taxa_fn = FN / (FN + VP) * 100 if (FN + VP) > 0 else 0
 
     return {
-        "inadimplencia_sem_modelos": round(inadimplencia_real, 2),
-        "inadimplencia_prevista": round(inadimplencia_prevista, 2),
-        "captacao_bons_clientes": round(captacao_bons_clientes, 2),
-        "taxa_aprovacao": round(taxa_aprovacao, 2),
-        "taxa_reprovacao": round(taxa_reprovacao, 2)
+        "precisao_alerta": round(precisao_alerta, 2),
+        "recall_fraude": round(recall_fraude, 2),
+        "taxa_alerta": round(taxa_alerta, 2),
+        "taxa_nao_alerta": round(taxa_nao_alerta, 2),
+        "f1_score": round(f1_score, 2),
+        "taxa_falsos_positivos": round(taxa_fp, 2),
+        "taxa_falsos_negativos": round(taxa_fn, 2)
     }
 
-# --------------------------------- Cálculo e Plot de Impacto Financeiro ------------------------
-
+# --------------------------------- Impacto Financeiro ------------------------
 def calcular_e_plotar_impacto(matriz_confusao, valor_medio_emprestimo, taxa_juros):
     VN, FP = matriz_confusao[0][0], matriz_confusao[0][1]
     FN, VP = matriz_confusao[1][0], matriz_confusao[1][1]
@@ -51,83 +51,85 @@ def calcular_e_plotar_impacto(matriz_confusao, valor_medio_emprestimo, taxa_juro
     perda_clientes_reprovados = FN * valor_medio_emprestimo * taxa_juros
     ganho_fraudes_reprovadas = VP * valor_medio_emprestimo
 
-    # DataFrame para exibição
     df_impacto = pd.DataFrame({
-        "Cenário": ["Ganho com bons clientes", "Perda por fraudes aprovadas", "Perda por bons reprovados", "Economia por fraudes reprovadas"],
-        "Valor (R$)": [ganho_bons, -perda_fraudes_aprovadas, -perda_clientes_reprovados, ganho_fraudes_reprovadas]
+        "Cenário": ["Ganho com bons clientes", "Perda por fraudes aprovadas",
+                    "Perda por bons reprovados", "Economia por fraudes reprovadas"],
+        "Valor (R$)": [ganho_bons, -perda_fraudes_aprovadas,
+                       -perda_clientes_reprovados, ganho_fraudes_reprovadas]
     })
 
-    # Gráfico com Plotly
-    fig = go.Figure(go.Bar(
-        x=df_impacto["Valor (R$)"],
-        y=df_impacto["Cenário"],
-        orientation='h',
-        marker=dict(color=df_impacto["Valor (R$)"], colorscale='RdYlGn'),
-        text=[f"R$ {v:,.2f}" for v in df_impacto["Valor (R$)"]],
-        textposition="auto"
-    ))
-
-    fig.update_layout(
-        title="💰 Impacto Financeiro do Modelo",
-        xaxis_title="Valor Estimado (R$)",
-        yaxis_title="Cenário",
-        height=400,
-        margin=dict(l=100, r=40, t=60, b=40)
-    )
+    # Gráfico de barras interativo
+    fig = px.bar(df_impacto, x="Cenário", y="Valor (R$)", color="Cenário",
+                 text="Valor (R$)", title="💰 Impacto Financeiro do Modelo",
+                 color_discrete_sequence=["#186826" if impacto > 0 else "#B11111" for impacto in df_impacto["Valor (R$)"]])
+    fig.update_traces(texttemplate="R$ %{y:,.2f}", textposition="auto", textfont_size=14, 
+                      )
+    fig.update_layout(yaxis_range=[min(df_impacto["Valor (R$)"])* 12, max(df_impacto["Valor (R$)"])*1.1],
+                      yaxis_zeroline=True, yaxis_zerolinecolor='grey', yaxis_zerolinewidth=1, 
+                      legend=dict(orientation='v', yanchor='top', y=1.4, xanchor='center', x=0.85))
 
     return df_impacto, fig
-# ----------------------- Plotagem das Inadimplências com e sem modelos -----------------------
-def plot_inadimplencia(inadimplencia_sem_modelo, inadimplencia_com_modelo):
+
+# ----------------------- Comparação de Fraudes -----------------------
+def plot_taxa_fraude(fraude_sem_modelo, fraude_com_modelo):
     """
-    Gera gráfico de barras comparando a inadimplência com e sem o uso do modelo.
-
-    Parâmetros:
-        inadimplencia_sem_modelo (float): Taxa sem modelo
-        inadimplencia_com_modelo (float): Taxa com modelo
-
-    Retorna:
-        matplotlib.figure.Figure: Figura pronta para exibição no Streamlit
+    Gera gráfico de barras comparando a taxa de fraudes detectadas com e sem o uso do modelo.
     """
-    import matplotlib.pyplot as plt
-    import seaborn as sns
+    df = pd.DataFrame({
+        "Cenário": ["Sem Modelo (Baseline)", "Com Modelo"],
+        "Taxa de Detecção (%)": [fraude_sem_modelo, fraude_com_modelo]
+    })
 
-    modelos = ["Sem Modelo (Baseline)", "Com Modelo"]
-    taxas = [inadimplencia_sem_modelo, inadimplencia_com_modelo]
-    cores = ["#d9534f", "#5cb85c"]  # vermelho e verde
-
-    fig, ax = plt.subplots(figsize=(8, 5))
-    sns.barplot(x=modelos, y=taxas, palette=cores, edgecolor="black", linewidth=1.5, ax=ax)
-
-    for i, valor in enumerate(taxas):
-        ax.text(i, valor + 0.5, f"{valor:.2f}%", ha="center", fontsize=12, fontweight="bold")
-
-    ax.set_title("Comparação da Taxa de Inadimplência", fontsize=16)
-    ax.set_ylabel("Taxa de Inadimplência (%)", fontsize=14)
-    ax.set_xlabel("Cenário", fontsize=14)
-    ax.set_ylim(0, max(taxas) + 10)
-    ax.grid(axis='y', linestyle='--', alpha=0.7)
+    fig = px.bar(df, x="Cenário", y="Taxa de Detecção (%)", color="Cenário",
+                 text="Taxa de Detecção (%)", title="Comparação da Taxa de Fraudes Detectadas")
+    fig.update_traces(texttemplate="%{y:.2f}%", textposition="outside")
 
     return fig
 
-
-
-
-def plot_hist(df, colunas_numericas):    
-    sns.set_theme("poster", "darkgrid") 
-    fig, ax = plt.subplots()
+# ----------------------- Gráficos adicionais -----------------------
+def plot_proporcao_fraudes(matriz_confusao):
+    """Pizza mostrando proporção de fraudes detectadas vs não detectadas"""
+    FN, VP = matriz_confusao[1]
+    df = pd.DataFrame({
+        "Categoria": ["Fraudes Detectadas", "Fraudes Não Detectadas"],
+        "Quantidade": [VP, FN]
+    })
+    fig = px.pie(df, values="Quantidade", names="Categoria",
+                 title="Proporção de Fraudes Detectadas vs Não Detectadas",
+                 color="Categoria", hole=0.4, color_discrete_sequence=['#186826', '#B11111'],
+                 )
+    fig.update_traces(textfont=dict(size=16),
+                      textposition='inside',
+                        hovertemplate='%{label}: %{value} (%{percent})<extra></extra>')
     
-    for coluna in df[colunas_numericas]:        
-                    
-        sns.histplot(data=df, x = coluna, kde=True, ax=ax)
-        ax.set_title(f"Histograma de {coluna}", fontsize=16, fontweight="bold")
-        ax.set_ylabel(f"Frequência de {coluna}", fontsize=12, fontweight="bold")
-        ax.set_xlabel(coluna, fontsize=12, fontweight="bold")
-        sns.despine(right=True, top=True)            
-        plt.tight_layout()
+    
+    return fig
+
+def plot_radar_metricas(metricas):
+    """Radar chart para comparar métricas de desempenho"""
+    categorias = list(metricas.keys())
+    valores = list(metricas.values())
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatterpolar(
+        r=valores,
+        theta=categorias,
+        fill='toself',
+        name='Métricas',
+        marker=dict(color='rgba(0, 255, 122, 0.7)',
+                line=dict(color='rgba(20, 205, 62, 1)', width=5))
+    ))
+    fig.update_layout(
+        polar=dict(radialaxis=dict(visible=True, range=[0, 100], dtick=20, color='grey')),
+        title="Radar de Métricas de Desempenho"
+    )
     return fig
 
 
 
+
+
+# ------------------------- Pré-processamento de Colunas Categóricas ------------------------
 def preprocessar_colunas_categoricas(X_treino, X_teste, colunas_categoricas):
     """
     Aplica Label Encoding nas colunas categóricas do DataFrame.
@@ -171,11 +173,11 @@ colunas_traduzidas = {
     'day': 'dia',
     'day_name': 'dia_semana',
     'is_weekend': 'fim_de_semana'
-}
+} # Dicionário para renomear colunas do dataset
 
-melhores_parametros = {'boosting_type': 'gbdt', 'colsample_bytree': 0.8730817875436903, 'learning_rate': 0.07687319555336146, 'max_depth': 3, 'min_child_samples': 32, 'n_estimators': 324,
-                        'num_leaves': 63, 'reg_alpha': 0.10660051374614865,
-                        'reg_lambda': 0.009666508676232064, 'scale_pos_weight': 1.0231160617210455, 'subsample': 0.6496996236271484}
+melhores_parametros = {'boosting_type': 'dart',  'colsample_bytree': 0.7282628285096816, 'learning_rate': 0.2, 'max_depth': 14,
+                        'min_child_samples':  74, 'n_estimators': 486, 'num_leaves': 20, 'reg_alpha': 1.948983261569964, 'reg_lambda': 10.0, 
+                        'scale_pos_weight': 1.2097547688535297, 'subsample': 0.5} # Melhores parâmetros obtidos via Bayesian Optimization
 
 markdown =  """
         <style>
@@ -213,4 +215,4 @@ markdown =  """
             <img src="https://images.seeklogo.com/logo-png/44/1/streamlit-logo-png_seeklogo-441815.png" alt="Streamlit Community">
         </a>
         </div>
-        """
+        """ # Rodapé com links para GitHub, LinkedIn e Streamlit Community

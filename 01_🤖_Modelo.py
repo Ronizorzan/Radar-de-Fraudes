@@ -1,11 +1,6 @@
 import pandas as pd
-import numpy as np
 from joblib import load
-from sklearn.model_selection import train_test_split
-from sklearn.feature_selection import SelectKBest, chi2
-from lightgbm import LGBMClassifier
 from plots import *
-from sklearn.metrics import accuracy_score, confusion_matrix
 import streamlit as st
 import pandas as pd
 
@@ -24,7 +19,7 @@ with st.sidebar:
     st.markdown("## 📊 Acurácia do Modelo")
     st.markdown(f"**{accuracy*100:.2f}%** baseado nos dados de validação")
     st.markdown("---")
-    st.markdown("## 🔗 Desenvolvedor: Ronivan")
+    st.markdown(markdown, unsafe_allow_html=True)
     # (links e rodapé mantidos)
 
 # Interface principal
@@ -67,10 +62,13 @@ if st.button("Avaliar Transação"):
             dados_novos[coluna] = le.transform(dados_novos[coluna].astype(str))       
 
     probabilidade = modelo.predict_proba(dados_novos)[0][1] * 100
-    classe = "Fraude" if probabilidade >= 30 else "Legítima"
+    classe = "Fraude" if probabilidade >= 50 else "Suspeita" if probabilidade < 30 else "Legítima"
 
-    if classe == "Fraude":
-        #probabilidade = 100 - probabilidade
+    if classe == "Fraude":        
         st.error(f"🚨 Transação suspeita! Probabilidade de fraude: {probabilidade:.2f}%")
+    
+    elif classe == "Legítima":
+        st.warning(f"⚠️ Transação suspeita! Probabilidade de fraude: {probabilidade:.2f}%")
+
     else:
         st.success(f"✅ Transação legítima. Probabilidade de fraude: {probabilidade:.2f}%")

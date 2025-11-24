@@ -48,7 +48,6 @@ confusion = confusion_matrix(y_teste, y_pred_bin)
 print(f"Acurácia do modelo: {accuracy*100:.2f}%")
 print("Matriz de Confusão:")
 print(confusion)
-print(colunas_selecionadas)
 
 # Salvar modelo e objetos
 dump(final_model, "objects/modelo_fraude.pkl")
